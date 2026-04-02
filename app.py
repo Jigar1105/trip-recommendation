@@ -235,7 +235,7 @@ def index():
     return render_template('index.html', states=states, months=months, results=results, graph=graph, name=current_user.name)
 
 # ==========================================
-# CREATE TABLES AND RUN APP
+# CREATE TABLES AND RUN App
 # ==========================================
 with app.app_context():
     db.create_all()
