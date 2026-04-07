@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>{{ itinerary.trip_title }} — Bharat Yatra</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet"/>
+  <style>
+    *, *::before, *::after { box-sizing:border-box; margin:0; padding:0; }
+    :root {
+      --saffron:#D4500A; --saffron-l:#F5784A;
+      --gold:#C8920A;    --gold-l:#F0B429;
+      --ink:#1C0F05;     --ink-2:#3D2612;
+      --cream:#FDF6EC;   --cream-2:#F5EAD8;
+      --muted:#8B6D50;
+      --border:rgba(200,146,10,0.18);
+      --card-bg:#FFFBF5;
+      --radius:16px;
+    }
+    body { font-family:'DM Sans',sans-serif; background:var(--cream); color:var(--ink); min-height:100vh; }
+
+    header { background:var(--ink); padding:0 40px; display:flex; align-items:center; justify-content:space-between; height:64px; position:sticky; top:0; z-index:200; }
+    .logo { font-family:'Cormorant Garamond',serif; font-size:24px; font-weight:600; color:var(--gold-l); }
+    .logo span { color:#fff; font-weight:400; font-style:italic; }
+    .nav-right { display:flex; align-items:center; gap:16px; }
+    .btn-nav { font-size:12px; color:rgba(255,255,255,0.7); text-decoration:none; border:1px solid rgba(255,255,255,0.15); padding:6px 16px; border-radius:20px; transition:all .2s; }
+    .btn-nav:hover { background:rgba(255,255,255,0.1); color:#fff; }
+
+    /* HERO */
+    .itin-hero {
+      background:var(--ink); padding:48px 40px 40px;
+      position:relative; overflow:hidden;
+    }
+    .itin-hero::before { content:''; position:absolute; inset:0; background:radial-gradient(ellipse 70% 80% at 70% 50%,rgba(212,80,10,0.18) 0%,transparent 70%); pointer-events:none; }
+    .hero-tag { display:inline-block; font-size:10px; letter-spacing:.16em; text-transform:uppercase; color:var(--gold-l); border:1px solid rgba(240,180,41,0.3); padding:3px 12px; border-radius:20px; margin-bottom:14px; }
+    .itin-hero h1 { font-family:'Cormorant Garamond',serif; font-size:clamp(28px,5vw,52px); font-weight:400; color:#fff; line-height:1.15; margin-bottom:10px; }
+    .itin-hero h1 em { color:var(--gold-l); font-style:italic; }
+    .hero-meta { display:flex; flex-wrap:wrap; gap:10px; margin-top:16px; }
+    .hero-badge { font-size:12px; color:rgba(255,255,255,0.75); background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.15); padding:5px 14px; border-radius:20px; }
+
+    /* OVERVIEW */
+    .content-wrap { max-width:900px; margin:0 auto; padding:36px 28px 80px; }
+    .overview-card {
+      background:var(--card-bg); border:1px solid var(--border); border-radius:18px;
+      padding:24px 28px; margin-bottom:28px;
+    }
+    .ov-title { font-size:11px; letter-spacing:.10em; text-transform:uppercase; color:var(--muted); font-weight:500; margin-bottom:10px; }
+    .ov-text { font-size:15px; color:var(--ink-2); line-height:1.75; font-weight:300; }
+    .ov-stats { display:flex; flex-wrap:wrap; gap:10px; margin-top:16px; }
+    .ov-stat { background:var(--cream-2); border:1px solid var(--border); border-radius:10px; padding:10px 16px; }
+    .ov-stat-num { font-family:'Cormorant Garamond',serif; font-size:22px; font-weight:600; color:var(--saffron); }
+    .ov-stat-label { font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.06em; }
+
+    /* GETTING THERE */
+    .getting-there {
+      background:linear-gradient(135deg,rgba(200,146,10,0.08),rgba(212,80,10,0.05));
+      border:1px solid var(--border); border-radius:14px;
+      padding:18px 22px; margin-bottom:28px;
+      display:flex; gap:14px; align-items:flex-start;
+    }
+    .gt-icon { font-size:24px; flex-shrink:0; margin-top:2px; }
+    .gt-label { font-size:11px; letter-spacing:.08em; text-transform:uppercase; color:var(--gold); font-weight:500; margin-bottom:4px; }
+    .gt-text { font-size:14px; color:var(--ink-2); line-height:1.6; }
+
+    /* SECTION HEADER */
+    .section-header { display:flex; align-items:center; gap:12px; margin-bottom:18px; }
+    .section-header h2 { font-family:'Cormorant Garamond',serif; font-size:28px; font-weight:400; }
+    .section-header::after { content:''; flex:1; height:1px; background:var(--border); }
+
+    /* DAY CARD */
+    .day-card {
+      background:var(--card-bg); border:1px solid var(--border); border-radius:18px;
+      margin-bottom:20px; overflow:hidden;
+    }
+    .day-header {
+      background:var(--ink); padding:16px 24px;
+      display:flex; align-items:center; justify-content:space-between;
+    }
+    .day-number { font-size:11px; letter-spacing:.12em; text-transform:uppercase; color:var(--gold-l); font-weight:500; }
+    .day-title { font-family:'Cormorant Garamond',serif; font-size:22px; font-weight:600; color:#fff; margin-top:2px; }
+    .day-budget-badge { font-size:12px; color:var(--gold-l); background:rgba(240,180,41,0.12); border:1px solid rgba(240,180,41,0.25); padding:4px 12px; border-radius:20px; white-space:nowrap; }
+    .day-body { padding:20px 24px; }
+
+    /* TIME SLOT */
+    .time-slot { display:flex; gap:16px; margin-bottom:16px; }
+    .time-slot:last-child { margin-bottom:0; }
+    .ts-time {
+      min-width:88px; font-size:11px; text-transform:uppercase; letter-spacing:.08em;
+      color:var(--muted); font-weight:500; padding-top:3px; flex-shrink:0;
+      display:flex; align-items:flex-start; gap:6px;
+    }
+    .ts-dot { width:8px; height:8px; border-radius:50%; background:var(--saffron); flex-shrink:0; margin-top:4px; }
+    .ts-content { background:var(--cream); border:1px solid var(--border); border-radius:10px; padding:12px 14px; flex:1; }
+    .ts-activity { font-weight:500; font-size:14px; margin-bottom:3px; }
+    .ts-place { font-size:13px; color:var(--muted); margin-bottom:4px; }
+    .ts-tip { font-size:12px; color:var(--ink-2); font-style:italic; margin-bottom:4px; }
+    .ts-cost { display:inline-block; font-size:11px; color:var(--gold); background:rgba(200,146,10,0.08); border:1px solid rgba(200,146,10,0.22); padding:2px 9px; border-radius:20px; }
+
+    /* DIVIDER LINE */
+    .ts-connector { width:1px; height:10px; background:var(--border); margin:2px 0 2px 3px; }
+
+    /* STAY + FOOD ROW */
+    .day-footer { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-top:16px; padding-top:16px; border-top:1px solid var(--border); }
+    .df-block { background:var(--cream); border:1px solid var(--border); border-radius:10px; padding:11px 14px; }
+    .df-label { font-size:10px; letter-spacing:.08em; text-transform:uppercase; color:var(--muted); font-weight:500; margin-bottom:4px; }
+    .df-val { font-size:13px; color:var(--ink-2); font-weight:500; }
+    .food-list { display:flex; flex-wrap:wrap; gap:6px; margin-top:4px; }
+    .food-tag { font-size:11px; background:rgba(200,146,10,0.08); border:1px solid rgba(200,146,10,0.22); color:var(--ink-2); padding:3px 9px; border-radius:20px; }
+
+    /* TIPS + CONTACTS */
+    .tips-section { margin-top:32px; }
+    .tips-grid { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+    .tips-card { background:var(--card-bg); border:1px solid var(--border); border-radius:14px; padding:18px 20px; }
+    .tc-label { font-size:11px; letter-spacing:.08em; text-transform:uppercase; color:var(--muted); font-weight:500; margin-bottom:12px; display:flex; align-items:center; gap:6px; }
+    .tip-item { display:flex; gap:8px; margin-bottom:8px; font-size:13px; color:var(--ink-2); line-height:1.5; }
+    .tip-item::before { content:'→'; color:var(--saffron); flex-shrink:0; }
+    .tip-item:last-child { margin-bottom:0; }
+
+    /* PRINT BUTTON */
+    .print-bar { display:flex; justify-content:flex-end; margin-bottom:24px; gap:10px; }
+    .btn-print { background:var(--ink); color:#fff; border:none; padding:10px 22px; border-radius:10px; font-family:'DM Sans',sans-serif; font-size:13px; font-weight:500; cursor:pointer; transition:background .2s; }
+    .btn-print:hover { background:var(--ink-2); }
+    .btn-back { background:var(--cream-2); color:var(--ink-2); border:1px solid var(--border); padding:10px 22px; border-radius:10px; font-family:'DM Sans',sans-serif; font-size:13px; text-decoration:none; transition:background .2s; }
+    .btn-back:hover { background:var(--cream); }
+
+    @media print {
+      header, .print-bar { display:none !important; }
+      body { background:#fff; }
+      .day-card, .overview-card { break-inside:avoid; }
+    }
+
+    @media (max-width:680px) {
+      header { padding:0 18px; }
+      .itin-hero { padding:32px 18px 28px; }
+      .content-wrap { padding:24px 16px 50px; }
+      .day-footer, .tips-grid { grid-template-columns:1fr; }
+      .time-slot { flex-direction:column; }
+      .ts-time { min-width:unset; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo">Bharat <span>Yatra</span></div>
+  <div class="nav-right">
+    <a href="{{ url_for('history') }}" class="btn-nav">← My Trips</a>
+    <a href="{{ url_for('index') }}" class="btn-nav">🔍 Discover</a>
+  </div>
+</header>
+
+<div class="itin-hero">
+  <div class="hero-tag">AI-Generated Itinerary</div>
+  <h1>{{ itinerary.trip_title | replace(meta.place_name, '<em>' + meta.place_name + '</em>') | safe }}</h1>
+  <div class="hero-meta">
+    <span class="hero-badge">📍 {{ meta.place_name }}, {{ meta.state }}</span>
+    <span class="hero-badge">📅 {{ meta.days }} Days</span>
+    <span class="hero-badge">💰 ₹{{ "{:,}".format(meta.budget | int) }} Budget</span>
+    <span class="hero-badge">🎒 {{ meta.travel_style | title }} Style</span>
+    <span class="hero-badge">📆 {{ meta.created_at.strftime('%d %b %Y') }}</span>
+  </div>
+</div>
+
+<div class="content-wrap">
+
+  <div class="print-bar">
+    <a href="{{ url_for('history') }}" class="btn-back">← Back to My Trips</a>
+    <button class="btn-print" onclick="window.print()">🖨️ Print / Save PDF</button>
+  </div>
+
+  <!-- OVERVIEW -->
+  <div class="overview-card">
+    <div class="ov-title">Trip Overview</div>
+    <div class="ov-text">{{ itinerary.overview }}</div>
+    <div class="ov-stats">
+      <div class="ov-stat">
+        <div class="ov-stat-num">{{ itinerary.days | length }}</div>
+        <div class="ov-stat-label">Days</div>
+      </div>
+      <div class="ov-stat">
+        <div class="ov-stat-num">{{ itinerary.total_estimated_cost }}</div>
+        <div class="ov-stat-label">Estimated Cost</div>
+      </div>
+      {% if itinerary.best_time_reminder %}
+      <div class="ov-stat" style="flex:2;">
+        <div class="ov-stat-num" style="font-size:14px;color:var(--gold);">🕐 {{ itinerary.best_time_reminder }}</div>
+        <div class="ov-stat-label">Best Time</div>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- GETTING THERE -->
+  {% if itinerary.getting_there %}
+  <div class="getting-there">
+    <div class="gt-icon">🚂</div>
+    <div>
+      <div class="gt-label">Kaise Pahunchen</div>
+      <div class="gt-text">{{ itinerary.getting_there }}</div>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- DAY BY DAY -->
+  <div class="section-header">
+    <h2>Day-by-Day Plan</h2>
+  </div>
+
+  {% for day in itinerary.days %}
+  <div class="day-card">
+    <div class="day-header">
+      <div>
+        <div class="day-number">Day {{ day.day }}</div>
+        <div class="day-title">{{ day.title }}</div>
+      </div>
+      {% if day.day_budget %}
+      <div class="day-budget-badge">💰 {{ day.day_budget }}</div>
+      {% endif %}
+    </div>
+    <div class="day-body">
+
+      {% for slot in ['morning', 'afternoon', 'evening'] %}
+      {% if day[slot] %}
+      <div class="time-slot">
+        <div class="ts-time">
+          <div class="ts-dot"></div>
+          {{ slot | title }}
+        </div>
+        <div class="ts-content">
+          <div class="ts-activity">{{ day[slot].activity }}</div>
+          {% if day[slot].place %}<div class="ts-place">📍 {{ day[slot].place }}</div>{% endif %}
+          {% if day[slot].tip %}<div class="ts-tip">💡 {{ day[slot].tip }}</div>{% endif %}
+          {% if day[slot].cost %}<span class="ts-cost">{{ day[slot].cost }}</span>{% endif %}
+        </div>
+      </div>
+      {% if not loop.last %}<div style="width:1px;height:8px;background:var(--border);margin:0 3px 8px 3px;"></div>{% endif %}
+      {% endif %}
+      {% endfor %}
+
+      <div class="day-footer">
+        <div class="df-block">
+          <div class="df-label">🏨 Stay Tonight</div>
+          <div class="df-val">{{ day.stay }}</div>
+        </div>
+        <div class="df-block">
+          <div class="df-label">🍽️ Khaana</div>
+          <div class="food-list">
+            {% for f in day.food %}<span class="food-tag">{{ f }}</span>{% endfor %}
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+  {% endfor %}
+
+  <!-- PACKING + CONTACTS -->
+  {% if itinerary.packing_tips or itinerary.important_contacts %}
+  <div class="tips-section">
+    <div class="section-header"><h2>Tips & Info</h2></div>
+    <div class="tips-grid">
+      {% if itinerary.packing_tips %}
+      <div class="tips-card">
+        <div class="tc-label">🎒 Packing Tips</div>
+        {% for tip in itinerary.packing_tips %}
+        <div class="tip-item">{{ tip }}</div>
+        {% endfor %}
+      </div>
+      {% endif %}
+      {% if itinerary.important_contacts %}
+      <div class="tips-card">
+        <div class="tc-label">📞 Important Numbers</div>
+        {% for contact in itinerary.important_contacts %}
+        <div class="tip-item">{{ contact }}</div>
+        {% endfor %}
+      </div>
+      {% endif %}
+    </div>
+  </div>
+  {% endif %}
+
+</div>
+
+</body>
+</html>
