@@ -1,4 +1,5 @@
 from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
+from flask_session import Session
 import pandas as pd
 import numpy as np
 from dotenv import load_dotenv
@@ -114,8 +115,11 @@ create_database_if_not_exists()
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'fallback_dev_key_change_in_production')
 app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+pymysql://root:@localhost/bharat_yatra'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.config['SESSION_TYPE'] = 'filesystem'        # ← ADD KARO
+app.config['SESSION_FILE_DIR'] = './flask_session'  # ← ADD KARO
 
 db = SQLAlchemy(app)
+Session(app)  # ← ADD KARO
 login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'login'
@@ -192,16 +196,19 @@ def load_user(user_id):
 # ==========================================
 # DATA LOADING & CLEANING
 # ==========================================
+ # ==========================================
+# DATA LOADING & CLEANING  —  M1 + M6 FIXED
+# ==========================================
 def load_and_clean():
     try:
         csv_path = os.path.join(os.path.dirname(__file__), 'cleaned_travel_data_unique.csv')
         df = pd.read_csv(csv_path)
         df.columns = df.columns.str.strip()
 
-        df['Type']            = df['Type'].fillna('general').str.lower()
+        df['Type']            = df['Type'].fillna('general').str.lower().str.strip()
         df['Best Visit Time'] = df['Best Visit Time'].fillna('Year-round')
-        df['State']           = df['State'].fillna('India').str.upper()
-        df['Ideal For']       = df['Ideal For'].fillna('all').str.lower()
+        df['State']           = df['State'].fillna('India').str.upper().str.strip()
+        df['Ideal For']       = df['Ideal For'].fillna('all').str.lower().str.strip()
         df['Place Name']      = df['Place Name'].fillna('').str.strip()
 
         if 'City' not in df.columns:
@@ -214,20 +221,42 @@ def load_and_clean():
         else:
             df['Stay Duration'] = df['Stay Duration'].fillna('2-3 days')
 
+        # ──────────────────────────────────────────────────────────────
+        # BUG M1 FIX: clean_cost — last number nahi, max meaningful number
+        # "Rs. 8,000 - Rs. 12,000 for 3 days" → pehle: 3, ab: 12000
+        # Logic: 100 se chhote numbers = days/nights/persons, ignore karo
+        # ──────────────────────────────────────────────────────────────
         def clean_cost(val):
             nums = re.findall(r'\d+', str(val).replace(',', ''))
-            return int(nums[-1]) if nums else 0
+            if not nums:
+                return 0
+            # 100 se chhote numbers = duration/quantity nahi, cost nahi
+            big_nums = [int(n) for n in nums if int(n) >= 100]
+            if big_nums:
+                return max(big_nums)   # ← max budget lo, last nahi
+            # Agar koi bhi number 100+ nahi (e.g. "5 days") → 0
+            return 0
 
         df['max_budget'] = df['Trip Cost'].apply(clean_cost)
+
+        # ──────────────────────────────────────────────────────────────
+        # BUG M6 FIX: Content field — important fields ko zyada weight do
+        # Type aur Ideal For ko repeat karke TF-IDF mein boost karo
+        # Pehle: sab 1x weight, ab: Type=3x, Ideal For=2x
+        # ──────────────────────────────────────────────────────────────
         df['content'] = (
-            df['Type'] + " " +
-            df['Place Name'].str.lower() + " " +
-            df['Best Visit Time'].str.lower() + " " +
-            df['Ideal For']
+            (df['Type'] + ' ') * 3 +               # Type — 3x weight (most important)
+            df['Place Name'].str.lower() + ' ' +
+            (df['Ideal For'] + ' ') * 2 +           # Ideal For — 2x weight
+            df['Best Visit Time'].str.lower()        # Best time — 1x weight
         )
+
+        logger.info(f"Data loaded: {len(df)} places, "
+                    f"max_budget range: {df['max_budget'].min()} - {df['max_budget'].max()}")
         return df
+
     except FileNotFoundError:
-        logger.error("final_travel_data_1000.csv not found!")
+        logger.error("cleaned_travel_data_unique.csv not found!")
         return pd.DataFrame()
     except Exception as e:
         logger.error(f"Error loading data: {e}")
@@ -238,7 +267,32 @@ df_master = load_and_clean()
 
 
 # ==========================================
-# KEYWORD EXPANSION
+# BUG M2 + M5 FIX: TF-IDF pre-compute at startup
+# Pehle: har request pe fit_transform() → slow, poor vocabulary
+# Ab: ek baar startup pe fit karo, har request pe sirf transform
+# ==========================================
+_vectorizer   = None   # global TF-IDF vectorizer
+_full_matrix  = None   # global TF-IDF matrix (full dataset)
+
+def _build_tfidf():
+    """Startup pe ek baar — poori dataset pe vectorizer fit karo."""
+    global _vectorizer, _full_matrix
+    if df_master.empty:
+        logger.warning("df_master empty — TF-IDF not built.")
+        return
+    try:
+        _vectorizer  = TfidfVectorizer(stop_words='english', min_df=1)
+        _full_matrix = _vectorizer.fit_transform(df_master['content'])
+        logger.info(f"TF-IDF built: {_full_matrix.shape[0]} docs, "
+                    f"{_full_matrix.shape[1]} features")
+    except Exception as e:
+        logger.error(f"TF-IDF build error: {e}")
+
+_build_tfidf()   # ← app start hote hi ek baar run
+
+
+# ==========================================
+# KEYWORD EXPANSION  —  unchanged, working fine
 # ==========================================
 def expand_keywords(user_type):
     synonyms = {
@@ -256,47 +310,91 @@ def expand_keywords(user_type):
     expanded = str(user_type).lower().strip()
     for key, val in synonyms.items():
         if key in expanded:
-            expanded += " " + val
+            expanded += ' ' + val
     return expanded
 
 
 # ==========================================
-# RECOMMENDATION ENGINE
+# RECOMMENDATION ENGINE  —  M2 + M3 + M4 + M5 FIXED
 # ==========================================
+MIN_SCORE = 0.05   # M4 FIX: 5% minimum similarity — pure garbage results block
+
 def get_recommendations(state, budget, interests):
-    if df_master.empty:
+    # Vectorizer ready check
+    if df_master.empty or _vectorizer is None or _full_matrix is None:
+        logger.error("Model not ready — df_master or TF-IDF missing.")
         return pd.DataFrame()
 
-    df   = df_master.copy()
+    df = df_master.copy()
+
+    # ── Hard filters (budget + state) ──────────────────────────────
     mask = df['max_budget'] <= float(budget)
-    if state != "All India":
+
+    # max_budget = 0 wale places (invalid cost data) ko exclude karo
+    # Warna Rs. 0 budget = sab mein match ho jaayega
+    mask = mask & (df['max_budget'] > 0)
+
+    if state != 'All India':
         mask = mask & (df['State'].str.upper() == state.strip().upper())
 
     filtered = df[mask].copy()
+
     if filtered.empty:
+        logger.info(f"No places found: state={state}, budget={budget}")
         return pd.DataFrame()
 
+    # Original index positions save karo (full matrix ke liye)
+    original_indices = filtered.index.tolist()
     filtered = filtered.reset_index(drop=True)
+
+    # ── Query vector build ─────────────────────────────────────────
     expanded_query = expand_keywords(interests)
 
-    vec       = TfidfVectorizer(stop_words='english')
-    matrix    = vec.fit_transform(filtered['content'])
-    query_vec = vec.transform([expanded_query])
+    # M2+M5 FIX: Pre-built vectorizer se sirf transform — fit nahi
+    query_vec = _vectorizer.transform([expanded_query])
 
+    # ── M3 FIX: Zero vector check ──────────────────────────────────
+    # Agar user ne sirf stop words likhe (the, a, is) ya unknown words
+    # → query_vec all-zeros → cosine undefined → random results
+    if query_vec.nnz == 0:
+        logger.warning(f"Zero query vector for interests='{interests}' — "
+                       f"falling back to budget sort")
+        # Fallback: budget ke andar best (highest budget = premium) places
+        return filtered.assign(Score=0.1).sort_values(
+            'max_budget', ascending=False
+        ).head(10)
+
+    # M2+M5 FIX: Full matrix mein se sirf filtered rows ka slice lo
+    filtered_matrix = _full_matrix[original_indices]
+
+    # ── KNN search ────────────────────────────────────────────────
     n_neighbors = min(len(filtered), 15)
     knn = NearestNeighbors(n_neighbors=n_neighbors, metric='cosine')
-    knn.fit(matrix)
+    knn.fit(filtered_matrix)
     distances, indices = knn.kneighbors(query_vec)
 
+    # ── Score assign ──────────────────────────────────────────────
     scores = np.zeros(len(filtered))
     for i, idx in enumerate(indices[0]):
         scores[idx] = 1 - distances[0][i]
 
     filtered['Score'] = scores
-    return filtered[filtered['Score'] > 0].sort_values(
+
+    # ── M4 FIX: Meaningful threshold — 0.05 minimum ───────────────
+    results = filtered[filtered['Score'] >= MIN_SCORE].sort_values(
         by=['Score', 'Place Name'], ascending=[False, True]
     )
 
+    # Agar threshold pe kuch nahi mila → top 5 by score (no empty results)
+    if results.empty:
+        logger.info(f"No results above threshold — returning top 5 by score")
+        results = filtered.nlargest(5, 'Score').sort_values(
+            by=['Score', 'Place Name'], ascending=[False, True]
+        )
+
+    logger.info(f"Recommendations: {len(results)} places for "
+                f"state={state}, budget={budget}, interests={interests}")
+    return results
 
 # ==========================================
 # ROUTE: Place Info (with Redis cache)
@@ -467,9 +565,8 @@ def saved_status():
     saved_set = {s.place_name for s in saved}
     return jsonify({'saved': list(saved_set)})
 
-
 # ==========================================
-# ROUTE: Generate Itinerary
+# ROUTE: Generate Enhanced Itinerary
 # ==========================================
 @app.route('/api/generate-itinerary', methods=['POST'])
 @login_required
@@ -483,78 +580,340 @@ def generate_itinerary():
     place_type   = data.get('type', '').strip()
     days         = int(data.get('days', 3))
     budget       = float(data.get('budget', 10000))
-    travel_style = data.get('travel_style', 'balanced')  # budget / balanced / luxury
+    travel_style = data.get('travel_style', 'balanced')
     ideal_for    = data.get('ideal_for', 'all')
+    source_city  = data.get('source_city', '').strip()   # NEW: starting city
 
     if not place_name:
         return jsonify({'error': 'Place name required'}), 400
+    if not source_city:
+        return jsonify({'error': 'Source city required'}), 400
 
     # Cache check
-    cache_key = make_cache_key('itinerary',
+    cache_key = make_cache_key('itinerary_v2',
         place=place_name, days=days,
-        budget=budget, style=travel_style
+        budget=budget, style=travel_style,
+        source=source_city
     )
     cached = cache_get(cache_key)
     if cached:
         logger.info(f"Itinerary cache HIT: {place_name}")
         return jsonify({'success': True, 'data': cached, 'cached': True})
 
+    # ---------- HOTEL STYLE GUIDE ----------
+    hotel_guide = {
+        'budget' : 'budget guesthouses, hostels, dharamshalas under ₹1,500/night',
+        'balanced': 'mid-range 3-star hotels ₹2,000–₹5,000/night',
+        'luxury' : 'premium 4-5 star resorts and boutique hotels ₹7,000+/night',
+    }.get(travel_style, 'mid-range hotels')
+
     prompt = f"""
-You are an expert Indian travel planner. Create a detailed day-by-day itinerary.
+You are an elite Indian travel planner. Create a hyper-detailed, professional trip itinerary.
 
-Destination: {place_name}, {state}, India
-Type: {place_type}
-Duration: {days} days
-Total Budget: ₹{budget:,.0f}
-Travel Style: {travel_style} (budget=cheap stays/dhabas, balanced=mid-range, luxury=premium)
-Ideal For: {ideal_for}
+TRIP DETAILS:
+- Starting City: {source_city}
+- Destination: {place_name}, {state}, India
+- Place Type: {place_type}
+- Duration: {days} days
+- Total Budget: Rs.{budget:,.0f}
+- Travel Style: {travel_style} ({hotel_guide})
+- Ideal For: {ideal_for}
 
-Return ONLY a valid JSON object (no markdown, no extra text):
+Return ONLY a valid JSON object (absolutely no markdown, no extra text, no backticks):
 {{
-  "trip_title": "Catchy trip title",
-  "overview": "2-3 sentences about this trip",
-  "total_estimated_cost": "₹X,XXX - ₹X,XXX",
-  "best_time_reminder": "One line reminder about when to visit",
+  "trip_title": "Catchy trip title with destination name",
+  "overview": "2-3 engaging sentences about why this trip is special",
+  "source_city": "{source_city}",
+  "destination": "{place_name}",
+  "state": "{state}",
+  "duration_days": {days},
+  "travel_style": "{travel_style}",
+  "total_budget_range": "Rs.X,XXX - Rs.X,XXX for {days} days per person",
+
+  "transport": {{
+    "outward": [
+      {{
+        "mode": "Flight",
+        "icon": "✈️",
+        "operator": "IndiGo / Air India / SpiceJet (example)",
+        "duration": "Xh Xm",
+        "price_range": "Rs.X,XXX - Rs.X,XXX per person",
+        "class": "Economy",
+        "frequency": "X flights daily",
+        "booking_tip": "Book 2-3 weeks in advance on MakeMyTrip or airline website",
+        "recommended_for": "luxury / balanced"
+      }},
+      {{
+        "mode": "Train",
+        "icon": "🚂",
+        "operator": "Specific train name and number if known",
+        "duration": "Xh Xm",
+        "price_range": "Rs.XXX - Rs.X,XXX per person (Sleeper to AC 2T)",
+        "class": "Sleeper / 3AC / 2AC",
+        "frequency": "X trains daily",
+        "booking_tip": "Book on IRCTC app, tatkal available",
+        "recommended_for": "budget / balanced"
+      }},
+      {{
+        "mode": "Bus",
+        "icon": "🚌",
+        "operator": "State SRTC or private operator name",
+        "duration": "Xh Xm",
+        "price_range": "Rs.XXX - Rs.X,XXX per person",
+        "class": "Sleeper / Volvo AC",
+        "frequency": "Multiple daily",
+        "booking_tip": "Book on RedBus or AbhiBus",
+        "recommended_for": "budget"
+      }},
+      {{
+        "mode": "Private Car",
+        "icon": "🚗",
+        "operator": "Self-drive or cab aggregator (Ola/Uber outstation)",
+        "duration": "Xh Xm",
+        "price_range": "Rs.X,XXX - Rs.X,XXX total (fuel + toll)",
+        "class": "Hatchback / Sedan / SUV",
+        "frequency": "Anytime",
+        "booking_tip": "Book Ola/Uber outstation or local taxi, carry cash for tolls",
+        "recommended_for": "balanced / luxury / groups"
+      }}
+    ],
+    "return": [
+      {{
+        "mode": "Flight",
+        "icon": "✈️",
+        "operator": "IndiGo / Air India / SpiceJet (example)",
+        "duration": "Xh Xm",
+        "price_range": "Rs.X,XXX - Rs.X,XXX per person",
+        "class": "Economy",
+        "booking_tip": "Book return together with outward for discounts"
+      }},
+      {{
+        "mode": "Train",
+        "icon": "🚂",
+        "operator": "Specific train name",
+        "duration": "Xh Xm",
+        "price_range": "Rs.XXX - Rs.X,XXX per person",
+        "class": "Sleeper / 3AC / 2AC",
+        "booking_tip": "Book on IRCTC, check return availability early"
+      }},
+      {{
+        "mode": "Bus",
+        "icon": "🚌",
+        "operator": "State SRTC or private operator",
+        "duration": "Xh Xm",
+        "price_range": "Rs.XXX - Rs.X,XXX per person",
+        "booking_tip": "Return buses available daily"
+      }},
+      {{
+        "mode": "Private Car",
+        "icon": "🚗",
+        "operator": "Local taxi or cab",
+        "duration": "Xh Xm",
+        "price_range": "Rs.X,XXX - Rs.X,XXX total",
+        "booking_tip": "Hire local driver at destination for return, often cheaper"
+      }}
+    ]
+  }},
+
+  "hotels": [
+    {{
+      "name": "Hotel Name 1",
+      "area": "Locality/Area name",
+      "stars": 4,
+      "price_per_night": "Rs.X,XXX",
+      "style_match": "{travel_style}",
+      "highlights": ["Swimming pool", "Free breakfast", "Free parking"],
+      "rating": "4.3",
+      "why_choose": "One sentence why this hotel is great",
+      "booking_platforms": ["MakeMyTrip", "Booking.com", "Hotel website"]
+    }},
+    {{
+      "name": "Hotel Name 2",
+      "area": "Locality/Area name",
+      "stars": 4,
+      "price_per_night": "Rs.X,XXX",
+      "style_match": "{travel_style}",
+      "highlights": ["Sea view", "Restaurant", "Spa"],
+      "rating": "4.1",
+      "why_choose": "One sentence why this hotel is great",
+      "booking_platforms": ["Goibibo", "Agoda"]
+    }},
+    {{
+      "name": "Hotel Name 3",
+      "area": "Locality/Area name",
+      "stars": 3,
+      "price_per_night": "Rs.X,XXX",
+      "style_match": "{travel_style}",
+      "highlights": ["Central location", "AC rooms", "WiFi"],
+      "rating": "3.9",
+      "why_choose": "One sentence why this hotel is great",
+      "booking_platforms": ["MakeMyTrip", "OYO"]
+    }},
+    {{
+      "name": "Hotel Name 4",
+      "area": "Locality/Area name",
+      "stars": 3,
+      "price_per_night": "Rs.X,XXX",
+      "style_match": "{travel_style}",
+      "highlights": ["Budget-friendly", "Clean rooms", "Good reviews"],
+      "rating": "3.7",
+      "why_choose": "One sentence why this hotel is great",
+      "booking_platforms": ["OYO", "Zostel"]
+    }},
+    {{
+      "name": "Hotel Name 5",
+      "area": "Locality/Area name",
+      "stars": 5,
+      "price_per_night": "Rs.X,XXX",
+      "style_match": "{travel_style}",
+      "highlights": ["Luxury amenities", "Fine dining", "Concierge"],
+      "rating": "4.7",
+      "why_choose": "One sentence why this hotel is great",
+      "booking_platforms": ["Taj Hotels", "MakeMyTrip"]
+    }}
+  ],
+
   "days": [
     {{
       "day": 1,
-      "title": "Day title (e.g. Arrival & Exploration)",
-      "morning": {{
-        "activity": "What to do",
-        "place": "Specific place name",
-        "tip": "Quick tip",
-        "cost": "₹XXX approx"
-      }},
-      "afternoon": {{
-        "activity": "What to do",
-        "place": "Specific place name",
-        "tip": "Quick tip",
-        "cost": "₹XXX approx"
-      }},
-      "evening": {{
-        "activity": "What to do",
-        "place": "Specific place name",
-        "tip": "Quick tip",
-        "cost": "₹XXX approx"
-      }},
-      "stay": "Hotel/stay recommendation with price range",
-      "food": ["breakfast suggestion", "lunch suggestion", "dinner suggestion"],
-      "day_budget": "₹X,XXX approx"
+      "title": "Day 1: Arrival & First Impressions",
+      "theme": "Arrival, settle in, light exploration",
+      "schedule": [
+        {{
+          "time": "06:00 AM",
+          "type": "transport",
+          "activity": "Depart from {source_city}",
+          "details": "Head to airport/railway station. Reach 1 hour early for domestic flights.",
+          "cost": "Rs.XXX (airport/station transfer)",
+          "icon": "🚕"
+        }},
+        {{
+          "time": "10:00 AM",
+          "type": "arrival",
+          "activity": "Arrive at {place_name}",
+          "details": "Collect luggage, hire local transport to hotel",
+          "cost": "Rs.XXX (local transfer)",
+          "icon": "📍"
+        }},
+        {{
+          "time": "11:00 AM",
+          "type": "hotel",
+          "activity": "Hotel check-in & freshen up",
+          "details": "Early check-in may be available for extra charge, else store luggage",
+          "cost": "Included in hotel",
+          "icon": "🏨"
+        }},
+        {{
+          "time": "12:30 PM",
+          "type": "restaurant",
+          "activity": "Lunch at Famous Local Restaurant",
+          "place": "Restaurant name with area",
+          "cuisine": "Local cuisine type",
+          "must_try": ["Dish 1", "Dish 2"],
+          "cost": "Rs.XXX per person",
+          "icon": "🍽️"
+        }},
+        {{
+          "time": "02:00 PM",
+          "type": "activity",
+          "activity": "Visit first attraction name",
+          "place": "Exact place name",
+          "details": "What to do/see there, tips to know",
+          "duration": "2 hours",
+          "cost": "Rs.XXX entry + auto",
+          "icon": "🏛️"
+        }},
+        {{
+          "time": "05:00 PM",
+          "type": "activity",
+          "activity": "Evening activity / viewpoint",
+          "place": "Place name",
+          "details": "What makes this special at this time",
+          "duration": "1.5 hours",
+          "cost": "Rs.XXX",
+          "icon": "🌅"
+        }},
+        {{
+          "time": "07:30 PM",
+          "type": "restaurant",
+          "activity": "Dinner at popular local spot",
+          "place": "Restaurant name",
+          "cuisine": "Cuisine type",
+          "must_try": ["Dish 1", "Dish 2"],
+          "cost": "Rs.XXX per person",
+          "icon": "🌙"
+        }},
+        {{
+          "time": "09:30 PM",
+          "type": "rest",
+          "activity": "Return to hotel, rest",
+          "details": "Good night's sleep for next day",
+          "cost": "Free",
+          "icon": "😴"
+        }}
+      ],
+      "day_total_cost": "Rs.X,XXX approx",
+      "insider_tip": "One golden tip for this day"
     }}
   ],
-  "packing_tips": ["tip 1", "tip 2", "tip 3"],
-  "important_contacts": ["Local police: 100", "Tourist helpline: 1363"],
-  "getting_there": "How to reach {place_name} from major cities"
+
+  "packing_list": {{
+    "essentials": ["Aadhar card/Passport", "Travel insurance", "Cash + Cards"],
+    "clothing": ["Item 1 specific to destination climate", "Item 2"],
+    "gear": ["Item relevant to activities"],
+    "medicines": ["Basic first aid", "ORS packets", "Any personal medication"]
+  }},
+
+  "budget_breakdown": {{
+    "transport_one_way": "Rs.X,XXX - Rs.X,XXX per person",
+    "transport_return": "Rs.X,XXX - Rs.X,XXX per person",
+    "accommodation_total": "Rs.X,XXX - Rs.X,XXX for {days} nights",
+    "food_total": "Rs.X,XXX - Rs.X,XXX for {days} days",
+    "activities_total": "Rs.X,XXX - Rs.X,XXX",
+    "local_transport": "Rs.X,XXX",
+    "miscellaneous": "Rs.XXX - Rs.X,XXX",
+    "grand_total": "Rs.X,XXX - Rs.X,XXX per person"
+  }},
+
+  "emergency_contacts": [
+    {{"name": "Police", "number": "100"}},
+    {{"name": "Ambulance", "number": "108"}},
+    {{"name": "Tourist Helpline", "number": "1363"}},
+    {{"name": "Women Helpline", "number": "1091"}}
+  ],
+
+  "best_time_reminder": "One line about when to visit and why",
+  "getting_there_summary": "2 sentences on best way to reach from {source_city}"
 }}
 
-Generate exactly {days} day objects in the days array.
+STRICT RULES:
+1. Generate EXACTLY {days} day objects in the days array, with each day having 6-8 schedule items
+2. RESTAURANTS — THIS IS CRITICAL: Always suggest REAL, FAMOUS, HIGHLY-RATED restaurants, dhabas, 
+   and cafes that are actually well-known in {place_name}, {state}. 
+   Examples of the QUALITY expected:
+   - Goa → Britto's, Fisherman's Wharf, Vinayak Family Restaurant, A Reverie
+   - Jaipur → Laxmi Mishtan Bhandar (LMB), Suvarna Mahal, Peacock Rooftop Restaurant
+   - Mumbai → Leopold Cafe, Britannia & Co., Trishna, Bademiya
+   - Manali → Johnson's Cafe, Drifter's Inn, Cafe 1947
+   DO NOT use generic names like "Famous Local Restaurant" or "Popular Eatery" — use ACTUAL place names.
+   If you are not certain of a specific restaurant, describe it precisely: 
+   e.g. "a popular rooftop cafe near Mall Road known for momos and maggi"
+3. Each restaurant entry MUST include:
+   - Actual place name (not placeholder)
+   - Exact area/locality  
+   - 2 signature dishes to try
+   - Approximate cost per person in Rs.
+4. All prices in Indian Rupees (Rs.) only
+5. Each day must have morning, afternoon and evening covered with times
+6. Transport prices should reflect real approximate Indian market rates
+7. Hotels should match the {travel_style} style exactly
 """
 
     try:
         response = groq_client.chat.completions.create(
             model="llama-3.3-70b-versatile",
             messages=[{"role": "user", "content": prompt}],
-            max_tokens=3000,
+            max_tokens=4000,
         )
         raw = response.choices[0].message.content
         raw = re.sub(r'^```json\s*', '', raw)
@@ -580,13 +939,44 @@ Generate exactly {days} day objects in the days array.
         db.session.add(new_itinerary)
         db.session.commit()
 
-        logger.info(f"Itinerary generated for {place_name} by user {current_user.id}")
+        logger.info(f"Enhanced itinerary generated for {place_name} by user {current_user.id}")
         return jsonify({'success': True, 'data': itinerary_data, 'itinerary_id': new_itinerary.id})
 
+    except json.JSONDecodeError as e:
+        logger.error(f"JSON parse error: {str(e)}\nRaw: {raw[:500]}")
+        return jsonify({'error': 'AI response format error, please try again'}), 500
     except Exception as e:
         logger.error(f"generate_itinerary error: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
+
+# ==========================================
+# ROUTE: Export Itinerary as Professional PDF
+# ==========================================
+@app.route('/itinerary/<int:itin_id>/export-pdf')
+@login_required
+def export_itinerary_pdf(itin_id):
+    """Generate and download a professional PDF itinerary"""
+    from pdf_generator import generate_itinerary_pdf
+    import io
+
+    itin = Itinerary.query.filter_by(id=itin_id, user_id=current_user.id).first_or_404()
+    data = json.loads(itin.itinerary_json)
+
+    # Generate PDF in memory
+    pdf_buffer = io.BytesIO()
+    generate_itinerary_pdf(data, pdf_buffer)
+    pdf_buffer.seek(0)
+
+    filename = f"BharatYatra_{itin.place_name.replace(' ', '_')}_{itin.days}Days.pdf"
+
+    from flask import send_file
+    return send_file(
+        pdf_buffer,
+        as_attachment=True,
+        download_name=filename,
+        mimetype='application/pdf'
+    )
 
 # ==========================================
 # ROUTE: History & Saved Places Page
@@ -697,14 +1087,17 @@ def logout():
 # ==========================================
 # MAIN ROUTE
 # ==========================================
+# ==========================================
+# MAIN ROUTE
+# ==========================================
 @app.route('/', methods=['GET', 'POST'])
 @login_required
 def index():
+    from flask import session
+
     states = []
     if not df_master.empty and 'State' in df_master.columns:
         states = sorted(df_master['State'].unique())
-
-    results = None
 
     if request.method == 'POST':
         state     = request.form.get('state', 'All India').strip() or 'All India'
@@ -719,7 +1112,6 @@ def index():
         if not results_df.empty:
             results = results_df.to_dict('records')
 
-            # ✅ Search history save karo
             history_entry = SearchHistory(
                 user_id       = current_user.id,
                 state         = state,
@@ -729,8 +1121,31 @@ def index():
             )
             db.session.add(history_entry)
             db.session.commit()
+
+            # Sirf zaroori fields session mein save karo
+            session['search_results'] = [
+                {
+                    'Place Name'    : r['Place Name'],
+                    'State'         : r['State'],
+                    'City'          : r.get('City', ''),
+                    'Type'          : r['Type'],
+                    'Best Visit Time': r['Best Visit Time'],
+                    'Ideal For'     : r['Ideal For'],
+                    'Trip Cost'     : r.get('Trip Cost', ''),
+                    'Stay Duration' : r.get('Stay Duration', '2-3 days'),
+                    'max_budget'    : int(r['max_budget']),
+                    'Score'         : float(r['Score']),
+                }
+                for r in results
+            ]
         else:
+            session.pop('search_results', None)
             flash('Koi result nahi mila. Budget ya filters adjust karo.', 'error')
+
+        return redirect(url_for('index'))  # ← BLINK FIX
+
+    # GET request
+    results = session.pop('search_results', None)
 
     return render_template('index.html',
         states  = states,
@@ -738,10 +1153,10 @@ def index():
         name    = current_user.name
     )
 
-
 # ==========================================
 # CREATE TABLES AND RUN
 # ==========================================
+from app import db, app
 with app.app_context():
     db.create_all()
 
