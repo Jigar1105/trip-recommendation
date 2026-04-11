@@ -1,286 +1,691 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>{{ itinerary.trip_title }} — Bharat Yatra</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com"/>
-  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet"/>
-  <style>
-    *, *::before, *::after { box-sizing:border-box; margin:0; padding:0; }
-    :root {
-      --saffron:#D4500A; --saffron-l:#F5784A;
-      --gold:#C8920A;    --gold-l:#F0B429;
-      --ink:#1C0F05;     --ink-2:#3D2612;
-      --cream:#FDF6EC;   --cream-2:#F5EAD8;
-      --muted:#8B6D50;
-      --border:rgba(200,146,10,0.18);
-      --card-bg:#FFFBF5;
-      --radius:16px;
-    }
-    body { font-family:'DM Sans',sans-serif; background:var(--cream); color:var(--ink); min-height:100vh; }
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{{ itinerary.trip_title }} | Bharat Yatra</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --saffron:    #FF6B35;
+  --deep-green: #1B4332;
+  --gold:       #F4A261;
+  --cream:      #FFF8F0;
+  --charcoal:   #1A1A2E;
+  --grey:       #6B7280;
+  --light-grey: #F3F4F6;
+  --white:      #ffffff;
+  --blue-dark:  #1D4ED8;
+  --blue-light: #EFF6FF;
+  --green-dark: #166534;
+  --green-light:#F0FDF4;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'DM Sans', sans-serif; background: #F7F3EE; color: var(--charcoal); }
 
-    header { background:var(--ink); padding:0 40px; display:flex; align-items:center; justify-content:space-between; height:64px; position:sticky; top:0; z-index:200; }
-    .logo { font-family:'Cormorant Garamond',serif; font-size:24px; font-weight:600; color:var(--gold-l); }
-    .logo span { color:#fff; font-weight:400; font-style:italic; }
-    .nav-right { display:flex; align-items:center; gap:16px; }
-    .btn-nav { font-size:12px; color:rgba(255,255,255,0.7); text-decoration:none; border:1px solid rgba(255,255,255,0.15); padding:6px 16px; border-radius:20px; transition:all .2s; }
-    .btn-nav:hover { background:rgba(255,255,255,0.1); color:#fff; }
+/* STICKY ACTIONS */
+.actions-bar {
+  position: sticky; top: 0; z-index: 100;
+  background: var(--white); border-bottom: 1px solid #E5E7EB;
+  padding: 12px 20px; display: flex; align-items: center;
+  justify-content: space-between; gap: 12px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+}
+.actions-left { display: flex; align-items: center; gap: 10px; }
+.actions-right { display: flex; gap: 10px; flex-wrap: wrap; }
+.page-title { font-size: 14px; font-weight: 700; color: var(--charcoal); }
 
-    /* HERO */
-    .itin-hero {
-      background:var(--ink); padding:48px 40px 40px;
-      position:relative; overflow:hidden;
-    }
-    .itin-hero::before { content:''; position:absolute; inset:0; background:radial-gradient(ellipse 70% 80% at 70% 50%,rgba(212,80,10,0.18) 0%,transparent 70%); pointer-events:none; }
-    .hero-tag { display:inline-block; font-size:10px; letter-spacing:.16em; text-transform:uppercase; color:var(--gold-l); border:1px solid rgba(240,180,41,0.3); padding:3px 12px; border-radius:20px; margin-bottom:14px; }
-    .itin-hero h1 { font-family:'Cormorant Garamond',serif; font-size:clamp(28px,5vw,52px); font-weight:400; color:#fff; line-height:1.15; margin-bottom:10px; }
-    .itin-hero h1 em { color:var(--gold-l); font-style:italic; }
-    .hero-meta { display:flex; flex-wrap:wrap; gap:10px; margin-top:16px; }
-    .hero-badge { font-size:12px; color:rgba(255,255,255,0.75); background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.15); padding:5px 14px; border-radius:20px; }
+/* BUTTONS */
+.btn {
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 9px 18px; border-radius: 10px; font-size: 13px;
+  font-weight: 600; cursor: pointer; text-decoration: none;
+  border: none; transition: all .2s; font-family: inherit;
+}
+.btn-saffron { background: var(--saffron); color: var(--white); }
+.btn-saffron:hover { background: #E85D25; transform: translateY(-1px); box-shadow: 0 4px 14px rgba(255,107,53,.35); }
+.btn-outline { background: transparent; border: 1.5px solid var(--deep-green); color: var(--deep-green); }
+.btn-outline:hover { background: var(--deep-green); color: var(--white); }
+.btn-ghost { background: var(--light-grey); color: var(--charcoal); }
+.btn-ghost:hover { background: #E5E7EB; }
 
-    /* OVERVIEW */
-    .content-wrap { max-width:900px; margin:0 auto; padding:36px 28px 80px; }
-    .overview-card {
-      background:var(--card-bg); border:1px solid var(--border); border-radius:18px;
-      padding:24px 28px; margin-bottom:28px;
-    }
-    .ov-title { font-size:11px; letter-spacing:.10em; text-transform:uppercase; color:var(--muted); font-weight:500; margin-bottom:10px; }
-    .ov-text { font-size:15px; color:var(--ink-2); line-height:1.75; font-weight:300; }
-    .ov-stats { display:flex; flex-wrap:wrap; gap:10px; margin-top:16px; }
-    .ov-stat { background:var(--cream-2); border:1px solid var(--border); border-radius:10px; padding:10px 16px; }
-    .ov-stat-num { font-family:'Cormorant Garamond',serif; font-size:22px; font-weight:600; color:var(--saffron); }
-    .ov-stat-label { font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.06em; }
+/* HERO */
+.hero {
+  background: linear-gradient(135deg, #0D1B2A 0%, #1B4332 60%, #2D5016 100%);
+  padding: 52px 24px 44px; position: relative; overflow: hidden;
+}
+.hero::before {
+  content: '';
+  position: absolute; inset: 0;
+  background: url("data:image/svg+xml,%3Csvg width='60' height='60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%23fff' fill-opacity='.03'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/svg%3E");
+}
+.hero-inner { max-width: 1100px; margin: 0 auto; position: relative; }
+.hero-badge {
+  display: inline-block;
+  background: rgba(255,107,53,.18); border: 1px solid var(--saffron);
+  color: var(--saffron); font-size: 11px; font-weight: 600;
+  letter-spacing: 2px; padding: 4px 14px; border-radius: 20px;
+  text-transform: uppercase; margin-bottom: 18px;
+}
+.hero h1 {
+  font-family: 'Playfair Display', serif;
+  font-size: clamp(24px, 4.5vw, 38px);
+  color: var(--white); line-height: 1.2; margin-bottom: 14px;
+}
+.hero-route {
+  font-size: 15px; color: var(--gold); font-weight: 600;
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  margin-bottom: 22px;
+}
+.hero-pills { display: flex; flex-wrap: wrap; gap: 10px; }
+.pill {
+  background: rgba(255,255,255,.1);
+  border: 1px solid rgba(255,255,255,.15);
+  backdrop-filter: blur(6px);
+  color: var(--white); padding: 7px 16px;
+  border-radius: 24px; font-size: 13px; font-weight: 500;
+}
+.saffron-bar { height: 4px; background: linear-gradient(90deg, var(--saffron), var(--gold), transparent); }
 
-    /* GETTING THERE */
-    .getting-there {
-      background:linear-gradient(135deg,rgba(200,146,10,0.08),rgba(212,80,10,0.05));
-      border:1px solid var(--border); border-radius:14px;
-      padding:18px 22px; margin-bottom:28px;
-      display:flex; gap:14px; align-items:flex-start;
-    }
-    .gt-icon { font-size:24px; flex-shrink:0; margin-top:2px; }
-    .gt-label { font-size:11px; letter-spacing:.08em; text-transform:uppercase; color:var(--gold); font-weight:500; margin-bottom:4px; }
-    .gt-text { font-size:14px; color:var(--ink-2); line-height:1.6; }
+/* LAYOUT */
+.container { max-width: 1100px; margin: 0 auto; padding: 0 20px; }
+.section { padding: 32px 0 16px; }
+.section-title {
+  font-family: 'Playfair Display', serif;
+  font-size: 21px; color: var(--deep-green);
+  display: flex; align-items: center; gap: 10px;
+  margin-bottom: 18px;
+}
+.section-title::after {
+  content: ''; flex: 1; height: 2px;
+  background: linear-gradient(90deg, var(--saffron) 0%, transparent 100%);
+  border-radius: 2px;
+}
 
-    /* SECTION HEADER */
-    .section-header { display:flex; align-items:center; gap:12px; margin-bottom:18px; }
-    .section-header h2 { font-family:'Cormorant Garamond',serif; font-size:28px; font-weight:400; }
-    .section-header::after { content:''; flex:1; height:1px; background:var(--border); }
+/* OVERVIEW CARD */
+.overview-card {
+  background: var(--cream); border: 1px solid #F0E8DF;
+  border-radius: 16px; padding: 26px;
+}
+.overview-text { font-size: 15px; line-height: 1.8; color: #374151; margin-bottom: 20px; }
+.stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
+.stat-box { background: var(--white); border: 1px solid #E5E7EB; border-radius: 12px; padding: 13px 15px; }
+.stat-label { font-size: 10px; font-weight: 700; color: var(--saffron); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 5px; }
+.stat-value { font-size: 13px; font-weight: 600; color: var(--charcoal); }
 
-    /* DAY CARD */
-    .day-card {
-      background:var(--card-bg); border:1px solid var(--border); border-radius:18px;
-      margin-bottom:20px; overflow:hidden;
-    }
-    .day-header {
-      background:var(--ink); padding:16px 24px;
-      display:flex; align-items:center; justify-content:space-between;
-    }
-    .day-number { font-size:11px; letter-spacing:.12em; text-transform:uppercase; color:var(--gold-l); font-weight:500; }
-    .day-title { font-family:'Cormorant Garamond',serif; font-size:22px; font-weight:600; color:#fff; margin-top:2px; }
-    .day-budget-badge { font-size:12px; color:var(--gold-l); background:rgba(240,180,41,0.12); border:1px solid rgba(240,180,41,0.25); padding:4px 12px; border-radius:20px; white-space:nowrap; }
-    .day-body { padding:20px 24px; }
+/* TRANSPORT */
+.dir-label {
+  font-size: 12px; font-weight: 700; color: var(--blue-dark);
+  text-transform: uppercase; letter-spacing: 1px;
+  margin: 20px 0 12px; padding-bottom: 8px;
+  border-bottom: 2px solid var(--blue-light);
+}
+.transport-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 14px; }
+.transport-card {
+  background: var(--white); border: 1.5px solid #BFDBFE;
+  border-radius: 14px; padding: 18px; position: relative;
+  transition: transform .2s, box-shadow .2s;
+}
+.transport-card:hover { transform: translateY(-3px); box-shadow: 0 8px 24px rgba(29,78,216,.12); }
+.t-mode { font-size: 15px; font-weight: 700; color: var(--blue-dark); margin-bottom: 6px; }
+.t-price { font-size: 16px; font-weight: 700; color: var(--saffron); margin: 8px 0; }
+.t-detail { font-size: 12px; color: var(--grey); line-height: 1.7; }
+.t-tip {
+  background: var(--blue-light); border-radius: 8px;
+  padding: 8px 10px; font-size: 11px; color: var(--blue-dark);
+  margin-top: 10px; font-weight: 500;
+}
+.rec-badge {
+  position: absolute; top: 12px; right: 12px;
+  background: var(--green-dark); color: var(--white);
+  font-size: 9px; font-weight: 700; padding: 2px 8px;
+  border-radius: 10px; text-transform: uppercase;
+}
 
-    /* TIME SLOT */
-    .time-slot { display:flex; gap:16px; margin-bottom:16px; }
-    .time-slot:last-child { margin-bottom:0; }
-    .ts-time {
-      min-width:88px; font-size:11px; text-transform:uppercase; letter-spacing:.08em;
-      color:var(--muted); font-weight:500; padding-top:3px; flex-shrink:0;
-      display:flex; align-items:flex-start; gap:6px;
-    }
-    .ts-dot { width:8px; height:8px; border-radius:50%; background:var(--saffron); flex-shrink:0; margin-top:4px; }
-    .ts-content { background:var(--cream); border:1px solid var(--border); border-radius:10px; padding:12px 14px; flex:1; }
-    .ts-activity { font-weight:500; font-size:14px; margin-bottom:3px; }
-    .ts-place { font-size:13px; color:var(--muted); margin-bottom:4px; }
-    .ts-tip { font-size:12px; color:var(--ink-2); font-style:italic; margin-bottom:4px; }
-    .ts-cost { display:inline-block; font-size:11px; color:var(--gold); background:rgba(200,146,10,0.08); border:1px solid rgba(200,146,10,0.22); padding:2px 9px; border-radius:20px; }
+/* HOTELS */
+.hotels-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 16px; }
+.hotel-card {
+  background: var(--white); border: 1.5px solid #BBF7D0;
+  border-radius: 16px; overflow: hidden;
+  transition: transform .2s, box-shadow .2s;
+}
+.hotel-card:hover { transform: translateY(-4px); box-shadow: 0 12px 32px rgba(22,101,52,.12); }
+.hotel-header {
+  background: linear-gradient(135deg, #DCFCE7, #F0FDF4);
+  padding: 15px 18px; border-bottom: 1px solid #BBF7D0;
+  display: flex; justify-content: space-between; align-items: flex-start;
+}
+.hotel-rank {
+  background: var(--deep-green); color: var(--white);
+  font-size: 11px; font-weight: 700; width: 26px; height: 26px;
+  border-radius: 50%; display: flex; align-items: center;
+  justify-content: center; flex-shrink: 0;
+}
+.hotel-name { font-size: 14px; font-weight: 700; color: var(--deep-green); margin-bottom: 3px; }
+.hotel-area { font-size: 11px; color: var(--grey); }
+.hotel-stars { color: #F59E0B; font-size: 12px; margin-top: 4px; }
+.hotel-price { font-size: 17px; font-weight: 700; color: var(--saffron); text-align: right; }
+.hotel-price small { display: block; font-size: 10px; color: var(--grey); font-weight: 400; }
+.hotel-body { padding: 14px 18px; }
+.hotel-why { font-size: 12px; color: #374151; line-height: 1.6; margin-bottom: 10px; }
+.hotel-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+.chip { background: var(--green-light); color: var(--green-dark); font-size: 10px; font-weight: 600; padding: 3px 10px; border-radius: 10px; }
+.hotel-book { font-size: 11px; color: var(--grey); }
+.hotel-book strong { color: var(--charcoal); }
 
-    /* DIVIDER LINE */
-    .ts-connector { width:1px; height:10px; background:var(--border); margin:2px 0 2px 3px; }
+/* DAY SCHEDULE */
+.day-block { margin-bottom: 28px; border-radius: 14px; overflow: hidden; box-shadow: 0 2px 12px rgba(0,0,0,.06); }
+.day-header {
+  background: linear-gradient(135deg, var(--deep-green), #2D5A27);
+  padding: 15px 20px; display: flex; align-items: center; gap: 14px;
+}
+.day-num {
+  background: var(--saffron); color: var(--white);
+  font-size: 14px; font-weight: 700;
+  width: 38px; height: 38px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+}
+.day-title-txt { font-size: 15px; font-weight: 700; color: var(--white); }
+.day-theme-txt { font-size: 11px; color: rgba(255,255,255,.6); margin-top: 3px; }
+.schedule-list { background: var(--white); }
+.sched-item {
+  display: grid; grid-template-columns: 88px 1fr;
+  border-bottom: 1px solid #F3F4F6;
+  transition: background .15s;
+}
+.sched-item:last-child { border-bottom: none; }
+.sched-item:hover { background: #FAFAFA; }
+.sched-time {
+  padding: 13px 10px; border-right: 2px solid #F3F4F6;
+  display: flex; flex-direction: column; align-items: flex-end;
+  gap: 4px;
+}
+.time-txt { font-size: 12px; font-weight: 700; color: var(--blue-dark); }
+.cost-txt { font-size: 10px; color: var(--saffron); font-weight: 600; }
+.sched-content { padding: 13px 15px; }
+.sched-act { font-size: 13px; font-weight: 700; color: var(--charcoal); margin-bottom: 4px; }
+.sched-place { font-size: 12px; color: var(--grey); margin-bottom: 3px; }
+.sched-detail { font-size: 12px; color: #374151; margin-bottom: 2px; }
+.sched-cuisine { font-size: 11px; color: #92400E; font-weight: 600; }
+.sched-must { font-size: 11px; color: var(--green-dark); margin-top: 3px; }
+.sched-dur { font-size: 11px; color: #7C3AED; margin-top: 2px; }
 
-    /* STAY + FOOD ROW */
-    .day-footer { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-top:16px; padding-top:16px; border-top:1px solid var(--border); }
-    .df-block { background:var(--cream); border:1px solid var(--border); border-radius:10px; padding:11px 14px; }
-    .df-label { font-size:10px; letter-spacing:.08em; text-transform:uppercase; color:var(--muted); font-weight:500; margin-bottom:4px; }
-    .df-val { font-size:13px; color:var(--ink-2); font-weight:500; }
-    .food-list { display:flex; flex-wrap:wrap; gap:6px; margin-top:4px; }
-    .food-tag { font-size:11px; background:rgba(200,146,10,0.08); border:1px solid rgba(200,146,10,0.22); color:var(--ink-2); padding:3px 9px; border-radius:20px; }
+/* Type color left strip */
+.type-transport  .sched-time { background: #EFF6FF; }
+.type-arrival    .sched-time { background: #F0FDF4; }
+.type-hotel      .sched-time { background: #FFF7ED; }
+.type-restaurant .sched-time { background: #FEF9C3; }
+.type-activity   .sched-time { background: #F5F3FF; }
+.type-rest       .sched-time { background: #F9FAFB; }
 
-    /* TIPS + CONTACTS */
-    .tips-section { margin-top:32px; }
-    .tips-grid { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
-    .tips-card { background:var(--card-bg); border:1px solid var(--border); border-radius:14px; padding:18px 20px; }
-    .tc-label { font-size:11px; letter-spacing:.08em; text-transform:uppercase; color:var(--muted); font-weight:500; margin-bottom:12px; display:flex; align-items:center; gap:6px; }
-    .tip-item { display:flex; gap:8px; margin-bottom:8px; font-size:13px; color:var(--ink-2); line-height:1.5; }
-    .tip-item::before { content:'→'; color:var(--saffron); flex-shrink:0; }
-    .tip-item:last-child { margin-bottom:0; }
+.day-footer {
+  display: flex; gap: 16px; padding: 12px 18px;
+  background: #FFFBEB; border-top: 1px solid #FDE68A;
+  flex-wrap: wrap;
+}
+.day-cost-txt { font-size: 13px; font-weight: 700; color: var(--saffron); }
+.day-tip-txt { font-size: 12px; color: #92400E; font-style: italic; }
 
-    /* PRINT BUTTON */
-    .print-bar { display:flex; justify-content:flex-end; margin-bottom:24px; gap:10px; }
-    .btn-print { background:var(--ink); color:#fff; border:none; padding:10px 22px; border-radius:10px; font-family:'DM Sans',sans-serif; font-size:13px; font-weight:500; cursor:pointer; transition:background .2s; }
-    .btn-print:hover { background:var(--ink-2); }
-    .btn-back { background:var(--cream-2); color:var(--ink-2); border:1px solid var(--border); padding:10px 22px; border-radius:10px; font-family:'DM Sans',sans-serif; font-size:13px; text-decoration:none; transition:background .2s; }
-    .btn-back:hover { background:var(--cream); }
+/* BUDGET TABLE */
+.budget-table { width: 100%; border-collapse: collapse; border-radius: 14px; overflow: hidden; box-shadow: 0 2px 16px rgba(0,0,0,.06); }
+.budget-table th { background: var(--deep-green); color: var(--white); font-size: 13px; font-weight: 600; padding: 13px 20px; text-align: left; }
+.budget-table td { padding: 11px 20px; font-size: 13px; border-bottom: 1px solid #E5E7EB; }
+.budget-table tr:nth-child(even) td { background: var(--light-grey); }
+.budget-table .grand-row td { background: #FFF3E8; font-weight: 700; color: var(--saffron); font-size: 15px; border-top: 2px solid var(--saffron); }
+.budget-amt { text-align: right; font-weight: 600; }
 
-    @media print {
-      header, .print-bar { display:none !important; }
-      body { background:#fff; }
-      .day-card, .overview-card { break-inside:avoid; }
-    }
+/* PACKING */
+.packing-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 14px; }
+.packing-card { border-radius: 12px; padding: 16px 18px; border: 1px solid #E5E7EB; }
+.packing-title { font-size: 13px; font-weight: 700; margin-bottom: 10px; }
+.packing-list { list-style: none; }
+.packing-list li {
+  font-size: 12px; color: #374151; padding: 4px 0;
+  border-bottom: 1px solid rgba(0,0,0,.05);
+  display: flex; align-items: center; gap: 8px;
+}
+.packing-list li::before { content: ''; width: 6px; height: 6px; background: var(--saffron); border-radius: 50%; flex-shrink: 0; }
 
-    @media (max-width:680px) {
-      header { padding:0 18px; }
-      .itin-hero { padding:32px 18px 28px; }
-      .content-wrap { padding:24px 16px 50px; }
-      .day-footer, .tips-grid { grid-template-columns:1fr; }
-      .time-slot { flex-direction:column; }
-      .ts-time { min-width:unset; }
-    }
-  </style>
+/* EMERGENCY */
+.emergency-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; }
+.emergency-card {
+  background: #FEF2F2; border: 1.5px solid #FECACA;
+  border-radius: 12px; padding: 14px 18px;
+  display: flex; align-items: center; justify-content: space-between;
+}
+.emg-name { font-size: 13px; font-weight: 600; color: #991B1B; }
+.emg-num { font-size: 18px; font-weight: 700; color: #DC2626; }
+
+/* GETTING THERE */
+.getting-card {
+  background: var(--cream); border: 1px solid #F0E8DF;
+  border-radius: 14px; padding: 18px 22px;
+}
+.getting-title { font-size: 14px; font-weight: 700; color: var(--deep-green); margin-bottom: 8px; }
+.getting-text { font-size: 13px; color: #374151; line-height: 1.8; }
+
+/* RESPONSIVE */
+@media (max-width: 640px) {
+  .sched-item { grid-template-columns: 74px 1fr; }
+  .transport-grid, .hotels-grid, .packing-grid { grid-template-columns: 1fr; }
+  .stats-grid { grid-template-columns: 1fr 1fr; }
+  .actions-right .btn span { display: none; }
+}
+
+/* PRINT */
+@media print {
+  .actions-bar { display: none; }
+  .hero { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  body { background: white; }
+  .day-block { page-break-inside: avoid; }
+}
+</style>
 </head>
 <body>
 
-<header>
-  <div class="logo">Bharat <span>Yatra</span></div>
-  <div class="nav-right">
-    <a href="{{ url_for('history') }}" class="btn-nav">← My Trips</a>
-    <a href="{{ url_for('index') }}" class="btn-nav">🔍 Discover</a>
+<!-- STICKY ACTION BAR -->
+<div class="actions-bar">
+  <div class="actions-left">
+    <a href="{{ url_for('history') }}" class="btn btn-ghost">← Back</a>
+    <span class="page-title">{{ itinerary.trip_title }}</span>
   </div>
-</header>
-
-<div class="itin-hero">
-  <div class="hero-tag">AI-Generated Itinerary</div>
-  <h1>{{ itinerary.trip_title | replace(meta.place_name, '<em>' + meta.place_name + '</em>') | safe }}</h1>
-  <div class="hero-meta">
-    <span class="hero-badge">📍 {{ meta.place_name }}, {{ meta.state }}</span>
-    <span class="hero-badge">📅 {{ meta.days }} Days</span>
-    <span class="hero-badge">💰 ₹{{ "{:,}".format(meta.budget | int) }} Budget</span>
-    <span class="hero-badge">🎒 {{ meta.travel_style | title }} Style</span>
-    <span class="hero-badge">📆 {{ meta.created_at.strftime('%d %b %Y') }}</span>
+  <div class="actions-right">
+    <a href="{{ url_for('export_itinerary_pdf', itin_id=meta.id) }}" class="btn btn-saffron">
+      ⬇️ <span>Download PDF</span>
+    </a>
+    <button onclick="window.print()" class="btn btn-outline">🖨️ <span>Print</span></button>
   </div>
 </div>
 
-<div class="content-wrap">
-
-  <div class="print-bar">
-    <a href="{{ url_for('history') }}" class="btn-back">← Back to My Trips</a>
-    <button class="btn-print" onclick="window.print()">🖨️ Print / Save PDF</button>
+<!-- HERO -->
+<div class="hero">
+  <div class="hero-inner">
+    <div class="hero-badge">✈ Bharat Yatra — AI Trip Plan</div>
+    <h1>{{ itinerary.trip_title }}</h1>
+    <div class="hero-route">
+      {% if itinerary.source_city %}
+        <span>📍 {{ itinerary.source_city }}</span>
+        <span style="color:rgba(255,255,255,.35);">────── ✈ ──────</span>
+      {% endif %}
+      <span>📍 {{ itinerary.destination }}{% if itinerary.state %}, {{ itinerary.state }}{% endif %}</span>
+    </div>
+    <div class="hero-pills">
+      <div class="pill">📅 {{ itinerary.duration_days }} Days</div>
+      {% if itinerary.travel_style %}
+        <div class="pill">💎 {{ itinerary.travel_style | capitalize }}</div>
+      {% endif %}
+      {% if itinerary.ideal_for %}
+        <div class="pill">👥 {{ itinerary.ideal_for | capitalize }}</div>
+      {% endif %}
+      {% if itinerary.total_budget_range %}
+        <div class="pill">💰 {{ itinerary.total_budget_range }}</div>
+      {% endif %}
+    </div>
   </div>
+</div>
+<div class="saffron-bar"></div>
+
+<div class="container">
 
   <!-- OVERVIEW -->
-  <div class="overview-card">
-    <div class="ov-title">Trip Overview</div>
-    <div class="ov-text">{{ itinerary.overview }}</div>
-    <div class="ov-stats">
-      <div class="ov-stat">
-        <div class="ov-stat-num">{{ itinerary.days | length }}</div>
-        <div class="ov-stat-label">Days</div>
+  <div class="section">
+    <h2 class="section-title">🌟 Trip Overview</h2>
+    <div class="overview-card">
+      {% if itinerary.overview %}
+        <p class="overview-text">{{ itinerary.overview }}</p>
+      {% endif %}
+      <div class="stats-grid">
+        {% if itinerary.source_city %}
+        <div class="stat-box">
+          <div class="stat-label">Starting From</div>
+          <div class="stat-value">{{ itinerary.source_city }}</div>
+        </div>
+        {% endif %}
+        <div class="stat-box">
+          <div class="stat-label">Destination</div>
+          <div class="stat-value">{{ itinerary.destination }}</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-label">Duration</div>
+          <div class="stat-value">{{ itinerary.duration_days }} Days</div>
+        </div>
+        {% if itinerary.travel_style %}
+        <div class="stat-box">
+          <div class="stat-label">Travel Style</div>
+          <div class="stat-value">{{ itinerary.travel_style | capitalize }}</div>
+        </div>
+        {% endif %}
+        {% if itinerary.best_time_reminder %}
+        <div class="stat-box" style="grid-column: span 2;">
+          <div class="stat-label">Best Time</div>
+          <div class="stat-value" style="font-size:12px;">{{ itinerary.best_time_reminder }}</div>
+        </div>
+        {% endif %}
       </div>
-      <div class="ov-stat">
-        <div class="ov-stat-num">{{ itinerary.total_estimated_cost }}</div>
-        <div class="ov-stat-label">Estimated Cost</div>
+    </div>
+  </div>
+
+  <!-- TRANSPORT -->
+  {% if itinerary.transport %}
+  <div class="section">
+    <h2 class="section-title">🚀 Transport Options</h2>
+
+    {# Outward #}
+    {% set outward = itinerary.transport.outward if itinerary.transport.outward is defined else [] %}
+    {% if outward %}
+    <div class="dir-label">
+      🛫 Outward Journey — {{ itinerary.source_city }} to {{ itinerary.destination }}
+    </div>
+    <div class="transport-grid">
+      {% for opt in outward %}
+      <div class="transport-card">
+        {% set rec = opt.recommended_for if opt.recommended_for is defined else '' %}
+        {% if itinerary.travel_style and itinerary.travel_style in rec %}
+          <div class="rec-badge">✓ Recommended</div>
+        {% endif %}
+        <div class="t-mode">
+          {% if opt.icon == 'plane' %}✈️
+          {% elif opt.icon == 'train' %}🚂
+          {% elif opt.icon == 'bus' %}🚌
+          {% elif opt.icon == 'car' %}🚗
+          {% else %}🚕{% endif %}
+          {{ opt.mode }}
+        </div>
+        <div class="t-price">{{ opt.price_range }}</div>
+        <div class="t-detail">
+          {% if opt.operator %}<b>Operator:</b> {{ opt.operator }}<br>{% endif %}
+          {% if opt.duration %}<b>Duration:</b> {{ opt.duration }}<br>{% endif %}
+          {% if opt.class %}<b>Class:</b> {{ opt.class }}<br>{% endif %}
+          {% if opt.frequency %}<b>Frequency:</b> {{ opt.frequency }}{% endif %}
+        </div>
+        {% if opt.booking_tip %}
+        <div class="t-tip">💡 {{ opt.booking_tip }}</div>
+        {% endif %}
       </div>
-      {% if itinerary.best_time_reminder %}
-      <div class="ov-stat" style="flex:2;">
-        <div class="ov-stat-num" style="font-size:14px;color:var(--gold);">🕐 {{ itinerary.best_time_reminder }}</div>
-        <div class="ov-stat-label">Best Time</div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    {# Return #}
+    {% set ret = itinerary.transport.return if itinerary.transport.return is defined else [] %}
+    {% if ret %}
+    <div class="dir-label" style="margin-top:24px;">
+      🛬 Return Journey — {{ itinerary.destination }} to {{ itinerary.source_city }}
+    </div>
+    <div class="transport-grid">
+      {% for opt in ret %}
+      <div class="transport-card">
+        <div class="t-mode">
+          {% if opt.icon == 'plane' %}✈️
+          {% elif opt.icon == 'train' %}🚂
+          {% elif opt.icon == 'bus' %}🚌
+          {% elif opt.icon == 'car' %}🚗
+          {% else %}🚕{% endif %}
+          {{ opt.mode }}
+        </div>
+        <div class="t-price">{{ opt.price_range }}</div>
+        <div class="t-detail">
+          {% if opt.operator %}<b>Operator:</b> {{ opt.operator }}<br>{% endif %}
+          {% if opt.duration %}<b>Duration:</b> {{ opt.duration }}<br>{% endif %}
+          {% if opt.class %}<b>Class:</b> {{ opt.class }}{% endif %}
+        </div>
+        {% if opt.booking_tip %}
+        <div class="t-tip">💡 {{ opt.booking_tip }}</div>
+        {% endif %}
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+  </div>
+  {% endif %}
+
+  <!-- HOTELS -->
+  {% if itinerary.hotels %}
+  <div class="section">
+    <h2 class="section-title">🏨 Recommended Hotels</h2>
+    <p style="font-size:13px; color:var(--grey); margin-bottom:16px;">
+      Top 5 options for <strong>{{ itinerary.travel_style | capitalize }}</strong> travel — prices per night
+    </p>
+    <div class="hotels-grid">
+      {% for hotel in itinerary.hotels %}
+      <div class="hotel-card">
+        <div class="hotel-header">
+          <div>
+            <div class="hotel-name">{{ hotel.name }}</div>
+            <div class="hotel-area">📍 {{ hotel.area }}</div>
+            <div class="hotel-stars">
+              {% for i in range(hotel.stars | int) %}★{% endfor %}{% for i in range(5 - hotel.stars | int) %}☆{% endfor %}
+              {{ hotel.rating }}/5
+            </div>
+          </div>
+          <div>
+            <div class="hotel-rank">{{ hotel.rank }}</div>
+            <div class="hotel-price">
+              {{ hotel.price_per_night }}
+              <small>per night</small>
+            </div>
+          </div>
+        </div>
+        <div class="hotel-body">
+          {% if hotel.why_choose %}
+            <p class="hotel-why">{{ hotel.why_choose }}</p>
+          {% endif %}
+          {% if hotel.highlights %}
+          <div class="hotel-chips">
+            {% for h in hotel.highlights %}
+              <span class="chip">✓ {{ h }}</span>
+            {% endfor %}
+          </div>
+          {% endif %}
+          {% if hotel.booking_platforms %}
+          <div class="hotel-book">
+            <strong>Book on:</strong> {{ hotel.booking_platforms | join(', ') }}
+          </div>
+          {% endif %}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- DAY-BY-DAY SCHEDULE -->
+  {% if itinerary.days %}
+  <div class="section">
+    <h2 class="section-title">🗓 Day-by-Day Itinerary</h2>
+    {% for day in itinerary.days %}
+    <div class="day-block">
+      <div class="day-header">
+        <div class="day-num">{{ day.day }}</div>
+        <div>
+          <div class="day-title-txt">{{ day.title }}</div>
+          {% if day.theme %}<div class="day-theme-txt">{{ day.theme }}</div>{% endif %}
+        </div>
+      </div>
+
+      <div class="schedule-list">
+        {% for item in day.schedule %}
+        {# Safely get item type #}
+        {% set itype = item.type if item.type is defined else 'activity' %}
+        <div class="sched-item type-{{ itype }}">
+          <div class="sched-time">
+            <span class="time-txt">{{ item.time if item.time is defined else '' }}</span>
+            {% if item.cost is defined and item.cost %}
+              <span class="cost-txt">{{ item.cost }}</span>
+            {% endif %}
+          </div>
+          <div class="sched-content">
+            <div class="sched-act">
+              {# Icon based on type #}
+              {% if itype == 'transport' %}🚕
+              {% elif itype == 'arrival' %}📍
+              {% elif itype == 'hotel' %}🏨
+              {% elif itype == 'restaurant' %}🍽️
+              {% elif itype == 'activity' %}🏛️
+              {% elif itype == 'rest' %}😴
+              {% else %}•{% endif %}
+              {{ item.activity if item.activity is defined else '' }}
+            </div>
+            {% if item.place is defined and item.place %}
+              <div class="sched-place">📍 {{ item.place }}</div>
+            {% endif %}
+            {% if item.details is defined and item.details %}
+              <div class="sched-detail">{{ item.details }}</div>
+            {% endif %}
+            {% if item.cuisine is defined and item.cuisine %}
+              <div class="sched-cuisine">🍴 Cuisine: {{ item.cuisine }}</div>
+            {% endif %}
+            {% if item.duration is defined and item.duration %}
+              <div class="sched-dur">⏱ Duration: {{ item.duration }}</div>
+            {% endif %}
+            {% if item.must_try is defined and item.must_try %}
+              <div class="sched-must">
+                ✨ Must try:
+                {% if item.must_try is iterable and item.must_try is not string %}
+                  {{ item.must_try | join(', ') }}
+                {% else %}
+                  {{ item.must_try }}
+                {% endif %}
+              </div>
+            {% endif %}
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+
+      {% if (day.day_total_cost is defined and day.day_total_cost) or (day.insider_tip is defined and day.insider_tip) %}
+      <div class="day-footer">
+        {% if day.day_total_cost is defined and day.day_total_cost %}
+          <span class="day-cost-txt">💸 Day Budget: {{ day.day_total_cost }}</span>
+        {% endif %}
+        {% if day.insider_tip is defined and day.insider_tip %}
+          <span class="day-tip-txt">💡 {{ day.insider_tip }}</span>
+        {% endif %}
       </div>
       {% endif %}
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <!-- BUDGET BREAKDOWN -->
+  {% if itinerary.budget_breakdown %}
+  <div class="section">
+    <h2 class="section-title">💰 Budget Breakdown</h2>
+    {% set b = itinerary.budget_breakdown %}
+    <table class="budget-table">
+      <thead>
+        <tr><th>Category</th><th style="text-align:right;">Estimated Cost</th></tr>
+      </thead>
+      <tbody>
+        {% if b.transport_one_way is defined and b.transport_one_way %}
+        <tr><td>✈️ Transport (Outward)</td><td class="budget-amt">{{ b.transport_one_way }}</td></tr>
+        {% endif %}
+        {% if b.transport_return is defined and b.transport_return %}
+        <tr><td>🔄 Transport (Return)</td><td class="budget-amt">{{ b.transport_return }}</td></tr>
+        {% endif %}
+        {% if b.accommodation_total is defined and b.accommodation_total %}
+        <tr><td>🏨 Accommodation Total</td><td class="budget-amt">{{ b.accommodation_total }}</td></tr>
+        {% endif %}
+        {% if b.food_total is defined and b.food_total %}
+        <tr><td>🍽️ Food and Dining</td><td class="budget-amt">{{ b.food_total }}</td></tr>
+        {% endif %}
+        {% if b.activities_total is defined and b.activities_total %}
+        <tr><td>🎯 Activities and Entry Fees</td><td class="budget-amt">{{ b.activities_total }}</td></tr>
+        {% endif %}
+        {% if b.local_transport is defined and b.local_transport %}
+        <tr><td>🚕 Local Transport</td><td class="budget-amt">{{ b.local_transport }}</td></tr>
+        {% endif %}
+        {% if b.miscellaneous is defined and b.miscellaneous %}
+        <tr><td>🛍️ Shopping and Misc</td><td class="budget-amt">{{ b.miscellaneous }}</td></tr>
+        {% endif %}
+      </tbody>
+      {% if b.grand_total is defined and b.grand_total %}
+      <tfoot>
+        <tr class="grand-row">
+          <td>💰 GRAND TOTAL (Per Person)</td>
+          <td class="budget-amt">{{ b.grand_total }}</td>
+        </tr>
+      </tfoot>
+      {% endif %}
+    </table>
+  </div>
+  {% endif %}
+
+  <!-- PACKING LIST -->
+  {% if itinerary.packing_list %}
+  <div class="section">
+    <h2 class="section-title">🎒 Packing Checklist</h2>
+    {% set p = itinerary.packing_list %}
+    <div class="packing-grid">
+      {% if p.essentials is defined and p.essentials %}
+      <div class="packing-card" style="background:#FEE2E2;">
+        <div class="packing-title">🪪 Essentials</div>
+        <ul class="packing-list">{% for i in p.essentials %}<li>{{ i }}</li>{% endfor %}</ul>
+      </div>
+      {% endif %}
+      {% if p.clothing is defined and p.clothing %}
+      <div class="packing-card" style="background:#DBEAFE;">
+        <div class="packing-title">👕 Clothing</div>
+        <ul class="packing-list">{% for i in p.clothing %}<li>{{ i }}</li>{% endfor %}</ul>
+      </div>
+      {% endif %}
+      {% if p.gear is defined and p.gear %}
+      <div class="packing-card" style="background:#D1FAE5;">
+        <div class="packing-title">🎒 Gear</div>
+        <ul class="packing-list">{% for i in p.gear %}<li>{{ i }}</li>{% endfor %}</ul>
+      </div>
+      {% endif %}
+      {% if p.medicines is defined and p.medicines %}
+      <div class="packing-card" style="background:#FEF9C3;">
+        <div class="packing-title">💊 Medicines</div>
+        <ul class="packing-list">{% for i in p.medicines %}<li>{{ i }}</li>{% endfor %}</ul>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- EMERGENCY CONTACTS -->
+  <div class="section">
+    <h2 class="section-title">🆘 Emergency Contacts</h2>
+    {% set contacts = itinerary.emergency_contacts if (itinerary.emergency_contacts is defined and itinerary.emergency_contacts) else [
+      {'name': 'Police', 'number': '100'},
+      {'name': 'Ambulance', 'number': '108'},
+      {'name': 'Tourist Helpline', 'number': '1363'},
+      {'name': 'Women Helpline', 'number': '1091'}
+    ] %}
+    <div class="emergency-grid">
+      {% for c in contacts %}
+      <div class="emergency-card">
+        <div class="emg-name">📞 {{ c.name }}</div>
+        <div class="emg-num">{{ c.number }}</div>
+      </div>
+      {% endfor %}
     </div>
   </div>
 
   <!-- GETTING THERE -->
-  {% if itinerary.getting_there %}
-  <div class="getting-there">
-    <div class="gt-icon">🚂</div>
-    <div>
-      <div class="gt-label">Kaise Pahunchen</div>
-      <div class="gt-text">{{ itinerary.getting_there }}</div>
+  {% if itinerary.getting_there_summary is defined and itinerary.getting_there_summary %}
+  <div class="section">
+    <div class="getting-card">
+      <div class="getting-title">🗺 Getting There</div>
+      <p class="getting-text">{{ itinerary.getting_there_summary }}</p>
     </div>
   </div>
   {% endif %}
 
-  <!-- DAY BY DAY -->
-  <div class="section-header">
-    <h2>Day-by-Day Plan</h2>
+  <!-- DISCLAIMER FOOTER -->
+  <div style="text-align:center; padding:22px 0 40px; border-top:1px solid #E5E7EB; margin-top:20px;">
+    <p style="font-size:11px; color:var(--grey); line-height:1.9;">
+      ⚠️ All prices, timings and hotel rates are approximate AI-generated estimates.<br>
+      Please verify all bookings and costs directly with service providers before travel.<br>
+      <strong>Generated by Bharat Yatra</strong>
+      {% if meta.created_at %}on {{ meta.created_at.strftime('%d %B %Y') }}{% endif %}
+    </p>
   </div>
 
-  {% for day in itinerary.days %}
-  <div class="day-card">
-    <div class="day-header">
-      <div>
-        <div class="day-number">Day {{ day.day }}</div>
-        <div class="day-title">{{ day.title }}</div>
-      </div>
-      {% if day.day_budget %}
-      <div class="day-budget-badge">💰 {{ day.day_budget }}</div>
-      {% endif %}
-    </div>
-    <div class="day-body">
-
-      {% for slot in ['morning', 'afternoon', 'evening'] %}
-      {% if day[slot] %}
-      <div class="time-slot">
-        <div class="ts-time">
-          <div class="ts-dot"></div>
-          {{ slot | title }}
-        </div>
-        <div class="ts-content">
-          <div class="ts-activity">{{ day[slot].activity }}</div>
-          {% if day[slot].place %}<div class="ts-place">📍 {{ day[slot].place }}</div>{% endif %}
-          {% if day[slot].tip %}<div class="ts-tip">💡 {{ day[slot].tip }}</div>{% endif %}
-          {% if day[slot].cost %}<span class="ts-cost">{{ day[slot].cost }}</span>{% endif %}
-        </div>
-      </div>
-      {% if not loop.last %}<div style="width:1px;height:8px;background:var(--border);margin:0 3px 8px 3px;"></div>{% endif %}
-      {% endif %}
-      {% endfor %}
-
-      <div class="day-footer">
-        <div class="df-block">
-          <div class="df-label">🏨 Stay Tonight</div>
-          <div class="df-val">{{ day.stay }}</div>
-        </div>
-        <div class="df-block">
-          <div class="df-label">🍽️ Khaana</div>
-          <div class="food-list">
-            {% for f in day.food %}<span class="food-tag">{{ f }}</span>{% endfor %}
-          </div>
-        </div>
-      </div>
-
-    </div>
-  </div>
-  {% endfor %}
-
-  <!-- PACKING + CONTACTS -->
-  {% if itinerary.packing_tips or itinerary.important_contacts %}
-  <div class="tips-section">
-    <div class="section-header"><h2>Tips & Info</h2></div>
-    <div class="tips-grid">
-      {% if itinerary.packing_tips %}
-      <div class="tips-card">
-        <div class="tc-label">🎒 Packing Tips</div>
-        {% for tip in itinerary.packing_tips %}
-        <div class="tip-item">{{ tip }}</div>
-        {% endfor %}
-      </div>
-      {% endif %}
-      {% if itinerary.important_contacts %}
-      <div class="tips-card">
-        <div class="tc-label">📞 Important Numbers</div>
-        {% for contact in itinerary.important_contacts %}
-        <div class="tip-item">{{ contact }}</div>
-        {% endfor %}
-      </div>
-      {% endif %}
-    </div>
-  </div>
-  {% endif %}
-
-</div>
-
+</div><!-- /container -->
 </body>
 </html>
