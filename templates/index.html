@@ -84,7 +84,15 @@
     .results-header { display:flex; align-items:baseline; gap:10px; margin-bottom:26px; }
     .results-header h2 { font-family:'Cormorant Garamond',serif; font-size:28px; font-weight:400; }
     .results-count { font-size:13px; color:var(--muted); }
-    .cards-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(286px,1fr)); gap:20px; }
+
+    /* ✅ FIX 1: Cards 3 column grid — side by side */
+    .cards-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 20px;
+    }
+    @media (max-width:1024px) { .cards-grid { grid-template-columns: repeat(2, 1fr); } }
+    @media (max-width:600px)  { .cards-grid { grid-template-columns: 1fr; } }
 
     .place-card { background:var(--card-bg); border:1px solid var(--border); border-radius:var(--radius); overflow:hidden; cursor:pointer; transition:transform .22s ease,box-shadow .22s ease; box-shadow:0 2px 20px rgba(28,15,5,0.08); }
     .place-card:hover { transform:translateY(-5px); box-shadow:0 14px 40px rgba(28,15,5,0.15); }
@@ -103,9 +111,18 @@
     .card-name { font-family:'Cormorant Garamond',serif; font-size:21px; font-weight:600; color:var(--ink); line-height:1.2; margin-bottom:10px; }
     .card-pills { display:flex; flex-wrap:wrap; gap:7px; margin-bottom:10px; }
     .pill { display:flex; align-items:center; gap:5px; font-size:12px; color:var(--ink-2); background:var(--cream-2); border:1px solid var(--border); padding:4px 10px; border-radius:20px; }
-    .best-time-row { display:flex; align-items:center; gap:7px; background:rgba(200,146,10,0.10); border:1px solid rgba(200,146,10,0.25); border-radius:8px; padding:7px 12px; }
+    .best-time-row { display:flex; align-items:center; gap:7px; background:rgba(200,146,10,0.10); border:1px solid rgba(200,146,10,0.25); border-radius:8px; padding:7px 12px; margin-bottom:12px; }
     .bt-label { font-size:10px; letter-spacing:.08em; text-transform:uppercase; color:var(--gold); font-weight:500; }
     .bt-val { font-size:13px; color:var(--ink-2); font-weight:500; }
+    .btn-plan-trip {
+      display:inline-flex; align-items:center; gap:7px;
+      padding:9px 18px; width:100%; justify-content:center;
+      background:#D4500A; color:#fff;
+      border:none; border-radius:10px;
+      font-size:13px; font-weight:500; cursor:pointer;
+      transition:all .2s; font-family:'DM Sans',sans-serif;
+    }
+    .btn-plan-trip:hover { background:#F5784A; transform:translateY(-1px); }
 
     .skeleton { width:100%; height:100%; position:absolute; inset:0; background:linear-gradient(90deg,var(--cream-2) 25%,var(--cream) 50%,var(--cream-2) 75%); background-size:200% 100%; animation:shimmer 1.4s infinite; }
     @keyframes shimmer { to { background-position:-200% 0; } }
@@ -292,12 +309,16 @@
             <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
             ₹{{ "{:,}".format(place['max_budget']) }}
           </span>
-        </div>
+        </div><!-- ✅ FIX 2: card-pills closing tag jo pehle missing tha -->
         <div class="best-time-row">
           <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="#C8920A" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
           <span class="bt-label">Best time</span>
           <span class="bt-val">{{ place['Best Visit Time'] }}</span>
         </div>
+        <button class="btn-plan-trip"
+          onclick="event.stopPropagation(); currentPlaceIdx={{ loop.index0 }}; openItineraryModal();">
+          🗓️ Plan Trip
+        </button>
       </div>
     </div>
     {% endfor %}
@@ -370,6 +391,10 @@
     </div>
     <div class="itin-form" id="itin-form">
       <div class="itin-field">
+        <label>Starting City</label>
+        <input type="text" id="itin-source-city" placeholder="e.g. Delhi, Mumbai" required/>
+      </div>
+      <div class="itin-field">
         <label>Number of Days</label>
         <select id="itin-days">
           <option value="1">1 Day (Quick Visit)</option>
@@ -418,7 +443,6 @@
   let currentPlaceIdx = -1;
   let selectedStyle   = 'balanced';
 
-  // Init saved status
   async function initSavedStatus() {
     if (!places.length) return;
     try {
@@ -434,7 +458,6 @@
     } catch(_) {}
   }
 
-  // Save / Unsave
   async function toggleSave(idx) {
     const p      = places[idx];
     if (!p) return;
@@ -480,7 +503,6 @@
     if (currentPlaceIdx >= 0) await toggleSave(currentPlaceIdx);
   }
 
-  // Images
   async function fetchUnsplashImage(query) {
     if (imageCache[query]) return imageCache[query];
     try {
@@ -494,15 +516,21 @@
     return null;
   }
 
-  async function loadCardImages() {
-    for (let i = 0; i < places.length; i++) {
-      const p   = places[i];
-      const url = await fetchUnsplashImage(p['Place Name'] + ' ' + p['State'] + ' India travel');
-      if (url) { const img = document.getElementById('card-img-' + i); if (img) img.src = url; }
-    }
+  // ✅ FIX 3: Parallel image loading — sab ek saath fetch hongi, blink nahi hoga
+  function loadCardImages() {
+    Promise.all(
+      places.map((p, i) =>
+        fetchUnsplashImage(p['Place Name'] + ' ' + p['State'] + ' India travel')
+          .then(url => {
+            if (url) {
+              const img = document.getElementById('card-img-' + i);
+              if (img) img.src = url;
+            }
+          })
+      )
+    );
   }
 
-  // AI info
   async function fetchGeminiInfo(place) {
     const key = place['Place Name'];
     if (geminiCache[key] !== undefined) return geminiCache[key];
@@ -560,7 +588,6 @@
     document.getElementById('gemini-error').style.display='block';
   }
 
-  // Place modal
   async function openModal(idx) {
     const p = places[idx]; if (!p) return;
     currentPlaceIdx = idx;
@@ -595,7 +622,6 @@
   }
   function handleBgClick(e) { if(e.target===document.getElementById('modalOverlay')) closeModal(); }
 
-  // Itinerary
   function openItineraryModal() {
     const p = places[currentPlaceIdx]; if (!p) return;
     document.getElementById('itin-place-subtitle').textContent = p['Place Name']+', '+p['State'];
@@ -619,13 +645,24 @@
     const p = places[currentPlaceIdx]; if (!p) return;
     const days   = parseInt(document.getElementById('itin-days').value);
     const budget = parseFloat(document.getElementById('itin-budget').value)||15000;
+    const sourceCity = document.getElementById('itin-source-city').value.trim();
+    if (!sourceCity) {
+      document.getElementById('itin-source-city').focus();
+      document.getElementById('itin-source-city').style.borderColor = '#EF4444';
+      document.getElementById('itin-source-city').style.boxShadow = '0 0 0 3px rgba(239,68,68,0.15)';
+      setTimeout(() => {
+        document.getElementById('itin-source-city').style.borderColor = '#E5E7EB';
+        document.getElementById('itin-source-city').style.boxShadow = '';
+      }, 2500);
+      return;
+    }
     document.getElementById('itin-form').style.display    = 'none';
     document.getElementById('itin-loading').style.display = 'block';
     document.getElementById('itin-result').style.display  = 'none';
     try {
       const res  = await fetch('/api/generate-itinerary', {
         method:'POST', headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({ place_name:p['Place Name'], state:p['State'], type:p['Type'], ideal_for:p['Ideal For'], days, budget, travel_style:selectedStyle })
+        body: JSON.stringify({ place_name:p['Place Name'], state:p['State'], type:p['Type'], ideal_for:p['Ideal For'], days, budget, travel_style:selectedStyle, source_city: sourceCity })
       });
       const data = await res.json();
       document.getElementById('itin-loading').style.display='none';
@@ -682,5 +719,6 @@
   if (places.length>0) { loadCardImages(); initSavedStatus(); }
   document.addEventListener('keydown', e=>{ if(e.key==='Escape'){closeModal();closeItineraryModal();} });
 </script>
+<script src="/static/itinerary_modal.js"></script>
 </body>
 </html>
